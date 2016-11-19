@@ -4,9 +4,9 @@
  *
  * @author Chris, @date 19/11/16 14:56
  */
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
+package chrisbaume;
+
+// parsing
 import java.util.Date;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -18,33 +18,27 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.jsoup.nodes.Document;
- 
+
+// login
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.HttpEntity;
+import org.apache.http.util.EntityUtils;
+import java.util.List;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import java.io.UnsupportedEncodingException;
+import java.io.IOException;
+import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.client.CookieStore;
+import org.apache.http.impl.client.BasicCookieStore;
+
 public class OWA {
 
-  protected String readFile(String filename)
-  {
-    String content = null;
-    File file = new File(filename);
-    FileReader reader = null;
-    try {
-      reader = new FileReader(file);
-      char[] chars = new char[(int) file.length()];
-      reader.read(chars);
-      content = new String(chars);
-      reader.close();
-    } catch (IOException e) {
-      e.printStackTrace();
-    } finally {
-      try {
-        if(reader !=null){reader.close();}
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
-    }
-    return content;
-  }
-
-  protected Date parseDate(String string) {
+  public Date parseDate(String string) {
     Date result = new Date();
     DateFormat format = new SimpleDateFormat("M/d/y h:m a");
     try {
@@ -55,7 +49,7 @@ public class OWA {
     return result;
   }
 
-  protected ArrayList<Map> parseList(String html) {
+  public ArrayList<Map> parseList(String html) {
     ArrayList<Map> results = new ArrayList<Map>();
     Document doc = Jsoup.parse(html);
     Elements rows = doc.select("div.cntnt table tr:gt(2)");
@@ -63,16 +57,16 @@ public class OWA {
       Elements cols = row.select("td");
       Map result = new HashMap();
       result.put("id", cols.eq(3).select("input").attr("value"));
-      result.put("name", cols.eq(4).text());
-      result.put("subject", cols.eq(5).text());
-      result.put("date", parseDate(cols.eq(6).text()));
-      result.put("size", cols.eq(7).text());
+      result.put("name", cols.eq(4).text().replace("\u00a0",""));
+      result.put("subject", cols.eq(5).text().replace("\u00a0",""));
+      result.put("date", parseDate(cols.eq(6).text().replace("\u00a0"," ")));
+      result.put("size", cols.eq(7).text().replace("\u00a0",""));
       results.add(result);
     }
     return results;
   }
 
-  protected Map parseEmail (String html) {
+  public Map parseEmail (String html) {
     Document doc = Jsoup.parse(html);
     Map result = new HashMap();
     ArrayList<String> toArray = new ArrayList<String>();
@@ -94,7 +88,7 @@ public class OWA {
     return result;
   }
 
-  protected ArrayList<String> parseRecentRecipients(String html) {
+  public ArrayList<String> parseRecentRecipients(String html) {
     Document doc = Jsoup.parse(html);
     ArrayList<String> emails = new ArrayList<String>(); 
     Elements rows = doc.select("#selmrr option");
@@ -103,9 +97,32 @@ public class OWA {
     }
     return emails;
   }
-
-  public static void main(String[] args) {
-    OWA owa = new OWA();
-    System.out.println(owa.parseRecentRecipients(owa.readFile(args[0])));
+  
+  public CookieStore login(String url, String username, String password) {
+    CookieStore cookieStore = new BasicCookieStore();
+    CloseableHttpClient httpclient = HttpClients.createDefault();
+    HttpClientContext context = HttpClientContext.create();
+    
+    HttpPost httpPost = new HttpPost(url);
+    List <NameValuePair> nvps = new ArrayList <NameValuePair>();
+    nvps.add(new BasicNameValuePair("curl", "Z2FowaZ2F"));
+    nvps.add(new BasicNameValuePair("flags", "0"));
+    nvps.add(new BasicNameValuePair("forcedownlevel", "0"));
+    nvps.add(new BasicNameValuePair("formdir", "1"));
+    nvps.add(new BasicNameValuePair("trusted", "4"));
+    nvps.add(new BasicNameValuePair("chkBsc", "1"));
+    nvps.add(new BasicNameValuePair("username", username));
+    nvps.add(new BasicNameValuePair("password", password));
+    
+    try {
+      httpPost.setEntity(new UrlEncodedFormEntity(nvps));
+      CloseableHttpResponse response1 = httpclient.execute(httpPost, context);
+      cookieStore = context.getCookieStore();
+    } catch (UnsupportedEncodingException e) {
+      e.printStackTrace();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    return cookieStore;
   }
 }
