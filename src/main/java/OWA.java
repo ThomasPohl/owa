@@ -19,7 +19,11 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.jsoup.nodes.Document;
 
-// login
+// http
+import java.util.List;
+import java.io.UnsupportedEncodingException;
+import java.io.IOException;
+import java.io.InputStream;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
@@ -27,16 +31,22 @@ import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.HttpEntity;
 import org.apache.http.util.EntityUtils;
-import java.util.List;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import java.io.UnsupportedEncodingException;
-import java.io.IOException;
 import org.apache.http.client.protocol.HttpClientContext;
-import org.apache.http.client.CookieStore;
-import org.apache.http.impl.client.BasicCookieStore;
+import org.apache.http.client.methods.HttpGet;
 
 public class OWA {
+
+  protected Document parseHtml(InputStream stream, String url) {
+    Document doc = null;
+    try {
+      doc = Jsoup.parse(stream, null, url);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    return doc;
+  }
 
   public Date parseDate(String string) {
     Date result = new Date();
@@ -49,10 +59,10 @@ public class OWA {
     return result;
   }
 
-  public ArrayList<Map> parseList(String html) {
+  public ArrayList<Map> parseList(InputStream html, String url) {
+    Document doc = parseHtml(html, url);
+    Elements rows = doc.select("div.cntnt table tr:gt(1)");
     ArrayList<Map> results = new ArrayList<Map>();
-    Document doc = Jsoup.parse(html);
-    Elements rows = doc.select("div.cntnt table tr:gt(2)");
     for (Element row: rows) {
       Elements cols = row.select("td");
       Map result = new HashMap();
@@ -66,14 +76,15 @@ public class OWA {
     return results;
   }
 
-  public Map parseEmail (String html) {
-    Document doc = Jsoup.parse(html);
+  public Map parseEmail (InputStream html, String url) {
+    Document doc = parseHtml(html, url);
     Map result = new HashMap();
     ArrayList<String> toArray = new ArrayList<String>();
     ArrayList<String> ccArray = new ArrayList<String>();
 
     result.put("subject", doc.select("td.sub").text());
     result.put("from", doc.select("td.frm").text());
+    result.put("body", doc.select("div.bdy").html());
     result.put("date", doc.select("td.hdtxnr:eq(0)").text());
     Elements toList = doc.select("#divTo a");
     for (Element toItem: toList) {
@@ -88,8 +99,8 @@ public class OWA {
     return result;
   }
 
-  public ArrayList<String> parseRecentRecipients(String html) {
-    Document doc = Jsoup.parse(html);
+  public ArrayList<String> parseRecentRecipients(InputStream html, String url) {
+    Document doc = parseHtml(html, url);
     ArrayList<String> emails = new ArrayList<String>(); 
     Elements rows = doc.select("#selmrr option");
     for (Element row: rows) {
@@ -98,8 +109,8 @@ public class OWA {
     return emails;
   }
   
-  public CookieStore login(String url, String username, String password) {
-    CookieStore cookieStore = new BasicCookieStore();
+  public HttpClientContext login(String url, String username, String password) {
+    CloseableHttpResponse response = null;
     CloseableHttpClient httpclient = HttpClients.createDefault();
     HttpClientContext context = HttpClientContext.create();
     
@@ -116,13 +127,58 @@ public class OWA {
     
     try {
       httpPost.setEntity(new UrlEncodedFormEntity(nvps));
-      CloseableHttpResponse response1 = httpclient.execute(httpPost, context);
-      cookieStore = context.getCookieStore();
+      response = httpclient.execute(httpPost, context);
     } catch (UnsupportedEncodingException e) {
       e.printStackTrace();
     } catch (IOException e) {
       e.printStackTrace();
+    } finally {
+      try {
+        response.close();
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
     }
-    return cookieStore;
+    return context;
+  }
+  
+  public ArrayList<Map> getList(String url, HttpClientContext session) {
+    CloseableHttpResponse response = null;
+    ArrayList<Map> results = new ArrayList<Map>();
+    CloseableHttpClient httpclient = HttpClients.createDefault();
+    HttpGet httpGet = new HttpGet(url);
+    try {
+      response = httpclient.execute(httpGet, session);
+      results = parseList(response.getEntity().getContent(), url);
+    } catch (IOException e) {
+      e.printStackTrace();
+    } finally {
+      try {
+        response.close();
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    }
+    return results;
+  }
+  
+  public Map getEmail(String url, HttpClientContext session) {
+    CloseableHttpResponse response = null;
+    Map email = null;
+    CloseableHttpClient httpclient = HttpClients.createDefault();
+    HttpGet httpGet = new HttpGet(url);
+    try {
+      response = httpclient.execute(httpGet, session);
+      email = parseEmail(response.getEntity().getContent(), url);
+    } catch (IOException e) {
+      e.printStackTrace();
+    } finally {
+      try {
+        response.close();
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    }
+    return email;
   }
 }
