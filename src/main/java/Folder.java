@@ -13,6 +13,20 @@ public class Folder {
   private int numPages;
   private ArrayList<Page> pages;
   
+  public Page getPage(int pageNum) {
+    if (pages == null) loadPages();
+    return pages.get(pageNum-1);
+  }
+  
+  public int getNumPages() {
+    if (numPages == 0) loadPages();
+    return numPages;
+  }
+  
+  public String getName() {
+    return name;
+  }
+  
   public Account getAccount() {
     return account;
   }
