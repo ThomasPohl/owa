@@ -14,7 +14,8 @@ import java.io.UnsupportedEncodingException;
 import java.io.IOException;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpRequestBase;
-
+import java.util.Map;
+import java.util.HashMap;
 import org.apache.http.cookie.Cookie;
 
 import org.jsoup.Jsoup;
@@ -27,7 +28,7 @@ public class Account {
   private String baseUrl;
   private String userContext;
   private HttpClientContext session;
-  private ArrayList<Folder> folders;
+  private Map<String,Folder> folders;
   private ArrayList<Recipient> recentRecipients;
   
   // public ArrayList<String> parseRecentRecipients(InputStream html, String url) {
@@ -39,6 +40,11 @@ public class Account {
     // }
     // return emails;
   // }
+  
+  public Folder getFolder(String name) {
+    if (folders == null) loadFolders();
+    return folders.get(name);
+  }
   
   public Document getDocument(HttpRequestBase request)
   {
@@ -65,7 +71,6 @@ public class Account {
   }
   
   public void loadFolders() {
-    System.out.println(getUserContext());
     HttpPost httpPost = new HttpPost(baseUrl+"?ae=Folder");
     List <NameValuePair> nvps = new ArrayList <NameValuePair>();
     nvps.add(new BasicNameValuePair("hidactbrfld", "1"));
@@ -78,14 +83,12 @@ public class Account {
     }
     Document doc = getDocument(httpPost);
     
-    folders = new ArrayList<Folder>();
+    folders = new HashMap<>();
     Elements rows = doc.select("#selbrfld option");
     for (Element row: rows) {
       String folderUrl = baseUrl+"?ae=Folder&t="+row.attr("value");
       String folderName = row.attr("title");
-      System.out.println(folderUrl);
-      System.out.println(folderName);
-      folders.add(new Folder(this, folderUrl, folderName));
+      folders.put(folderName, new Folder(this, folderUrl, folderName));
     }
   }
   
@@ -110,7 +113,9 @@ public class Account {
     }
     
     System.err.println("Could not fetch user context");
+    System.err.println(response.getFirstHeader("X-OWA-Error").getValue());
     System.err.println(cookies);
+    System.err.println(response);
     return null;
   }
   
