@@ -4,6 +4,7 @@ package chrisbaume.owa;
 import java.util.ArrayList;
 import org.jsoup.nodes.Document;
 import org.apache.http.client.methods.HttpGet;
+import org.jsoup.select.Elements;
 
 public class Folder {
   private Account account;
@@ -16,13 +17,18 @@ public class Folder {
     return account;
   }
   
-  protected void loadPages() {
+  public void loadPages() {
     Document doc = account.getDocument(new HttpGet(url));
     
-    String lastPage = doc.select("#lnkLstPg").attr("onclick");
-    int numStart = lastPage.indexOf("'")+1;
-    int numEnd = lastPage.indexOf("'", numStart);
-    numPages = Integer.parseInt(lastPage.substring(numStart, numEnd));
+    Elements lastPageLink = doc.select("#lnkLstPg");
+    if (lastPageLink.isEmpty()) {
+      numPages = 1;
+    } else {
+      String lastPage = lastPageLink.attr("onclick");
+      int numStart = lastPage.indexOf("'")+1;
+      int numEnd = lastPage.indexOf("'", numStart);
+      numPages = Integer.parseInt(lastPage.substring(numStart, numEnd));
+    }
     
     pages = new ArrayList<Page>();
     for (int i=0; i<numPages; i++) {
@@ -39,6 +45,5 @@ public class Folder {
     account = account_in;
     url = url_in;
     name = name_in;
-    //loadPages();
   }
 }
