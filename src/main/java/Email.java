@@ -44,6 +44,22 @@ public class Email {
   private ArrayList<String> to;
   private ArrayList<String> cc;
   
+  public String getSubject() {
+    return subject;
+  }
+  
+  public String getFrom() {
+    return from;
+  }
+  
+  public Date getDate() {
+    return date;
+  }
+  
+  public int getSizeKB() {
+    return sizeKB;
+  }
+  
   Email(String url)
   {
     loadEmail();
