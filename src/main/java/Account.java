@@ -31,15 +31,51 @@ public class Account {
   private Map<String,Folder> folders;
   private ArrayList<Recipient> recentRecipients;
   
-  // public ArrayList<String> parseRecentRecipients(InputStream html, String url) {
-    // Document doc = parseHtml(html, url);
-    // ArrayList<String> emails = new ArrayList<String>(); 
-    // Elements rows = doc.select("#selmrr option");
-    // for (Element row: rows) {
-      // emails.add(row.text()+" <"+row.attr("title")+">");
-    // }
-    // return emails;
-  // }
+  protected CloseableHttpResponse sendRequest(HttpRequestBase request) {
+    CloseableHttpResponse response = null;
+    CloseableHttpClient httpclient = HttpClients.createDefault();
+    try {
+      response = httpclient.execute(request, session);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    if (response.containsHeader("X-OWA-Error")) {
+      System.err.println(response.getFirstHeader("X-OWA-Error").getValue());
+    }
+    return response;
+  }
+  
+  public void sendEmail(String to, String cc, String bcc, String subject, String body)
+  {
+    HttpPost httpPost = new HttpPost(baseUrl+"?ae=PreFormAction&t=IPM.Note&a=Send");
+    List <NameValuePair> nvps = new ArrayList <NameValuePair>();
+    nvps.add(new BasicNameValuePair("txtto", to));
+    nvps.add(new BasicNameValuePair("txtcc", cc));
+    nvps.add(new BasicNameValuePair("txtbcc", bcc));
+    nvps.add(new BasicNameValuePair("txtsbj", subject));
+    nvps.add(new BasicNameValuePair("txtbdy", body));
+    nvps.add(new BasicNameValuePair("hidunrslrcp", "0"));
+    nvps.add(new BasicNameValuePair("hidmsgimp", "1"));
+    nvps.add(new BasicNameValuePair("hidpid", "EditMessage"));
+    nvps.add(new BasicNameValuePair("hidcanary", getUserContext()));
+    nvps.add(new BasicNameValuePair("hidcmdpst", "snd"));
+    try {
+      httpPost.setEntity(new UrlEncodedFormEntity(nvps));
+    } catch (UnsupportedEncodingException e) {
+      e.printStackTrace();
+    }
+    sendRequest(httpPost);
+  }
+  
+  public void loadRecentRecipients() {
+    Document doc = getDocument(new HttpGet(baseUrl+"?ae=Item&t=IPM.Note&a=New"));
+    Elements rows = doc.select("#selmrr option");
+    recentRecipients = new ArrayList<Recipient>();
+    for (Element row: rows) {
+      recentRecipients.add(new Recipient(row.text(), row.attr("title")));
+      System.out.println(row.text()+"\t"+row.attr("title"));
+    }    
+  }
   
   public Folder getFolder(String name) {
     if (folders == null) loadFolders();
@@ -49,23 +85,11 @@ public class Account {
   public Document getDocument(HttpRequestBase request)
   {
     Document doc = null;
-    CloseableHttpResponse response = null;
-    CloseableHttpClient httpclient = HttpClients.createDefault();
+    CloseableHttpResponse response = sendRequest(request);
     try {
-      response = httpclient.execute(request, session);
-      try {
-        doc = Jsoup.parse(response.getEntity().getContent(), null, request.getURI().toString());
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
+      doc = Jsoup.parse(response.getEntity().getContent(), null, request.getURI().toString());
     } catch (IOException e) {
       e.printStackTrace();
-    } finally {
-      try {
-        response.close();
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
     }
     return doc;
   }
@@ -95,14 +119,8 @@ public class Account {
   protected String getUserContext() {
     if (userContext != null) return userContext;
     
-    CloseableHttpResponse response = null;
     HttpGet request = new HttpGet(baseUrl);
-    CloseableHttpClient httpclient = HttpClients.createDefault();
-    try {
-      response = httpclient.execute(request, session);
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
+    CloseableHttpResponse response = sendRequest(request);
     
     List<Cookie> cookies = session.getCookieStore().getCookies();
     for (Cookie cookie: cookies) {
@@ -111,18 +129,13 @@ public class Account {
         return userContext;
       }
     }
-    
-    System.err.println("Could not fetch user context");
-    System.err.println(response.getFirstHeader("X-OWA-Error").getValue());
-    System.err.println(cookies);
-    System.err.println(response);
+    // System.err.println(cookies);
+    // System.err.println(response);
     return null;
   }
   
   public Account(String url, String username, String password)
   {
-    CloseableHttpResponse response = null;
-    CloseableHttpClient httpclient = HttpClients.createDefault();
     session = HttpClientContext.create();
     
     HttpPost httpPost = new HttpPost(url);
@@ -138,21 +151,15 @@ public class Account {
     
     try {
       httpPost.setEntity(new UrlEncodedFormEntity(nvps));
-      response = httpclient.execute(httpPost, session);
     } catch (UnsupportedEncodingException e) {
       e.printStackTrace();
-    } catch (IOException e) {
-      e.printStackTrace();
-    } finally {
-      try {
-        response.close();
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
     }
+    CloseableHttpResponse response = sendRequest(httpPost);
     
     if (response.getStatusLine().getStatusCode() == 302) {    
       baseUrl = response.getFirstHeader("Location").getValue();
+    } else {
+      System.err.println("Login failed");
     }
   }
 }
