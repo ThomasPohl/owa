@@ -17,3 +17,29 @@ Java library which wraps OWA
 ## Build
 
     gradle build
+
+## Development plan
+
+Please create an issue to add to this list.
+
+* ~~Login~~
+* ~~List folders~~
+* ~~List emails~~
+* ~~Read email~~
+* ~~Send email~~
+* ~~List recent recipients~~
+* Reply (all) to email
+* Forward email
+* Delete email
+* List all contacts
+* Move/copy email
+* Add attachment
+* View and set (un)read status
+* View and set flags
+* Mark as spam
+* View calendar
+* View appointment/meeting
+* Add appointment
+* Send meeting request
+* Email threads
+* Search address books
